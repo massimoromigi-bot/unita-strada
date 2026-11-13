@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="it" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Unità di Strada - Registro Rilevazioni</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #121212;
+            color: #F3F4F6;
+            -webkit-tap-highlight-color: transparent;
+        }
+        /* Stili personalizzati per scrollbar discreta su mobile */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #121212;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 3px;
+        }
+        /* Evita zoom automatico su input iOS/Android */
+        input, select, textarea {
+            font-size: 16px !important;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col max-w-lg mx-auto bg-[#121212] border-x border-neutral-800 shadow-2xl">
+
+    <!-- HEADER FISSO COMPATTO -->
+    <header class="sticky top-0 z-40 bg-[#1A1A1A]/95 backdrop-blur-md border-b border-neutral-800 px-4 py-3 flex items-center justify-between shadow-md">
+        <div class="flex items-center gap-3">
+            <!-- Icona Croce Rossa Stilizzata -->
+            <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-inner shrink-0">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M9 3H15V9H21V15H15V21H9V15H3V9H9V3Z" fill="#D32F2F"/>
+                </svg>
+            </div>
+            <div>
+                <h1 class="font-extrabold text-lg leading-tight text-white tracking-tight">Unità di Strada</h1>
+                <div class="flex items-center gap-1.5 mt-0.5">
+                    <span id="cloud-status-dot" class="w-2 h-2 rounded-full bg-amber-500"></span>
+                    <p id="cloud-status-text" class="text-[11px] text-amber-400 font-semibold">Solo Locale (Cloud non config.)</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="flex items-center gap-2.5">
+            <!-- Pulsante Impostazioni Cloud -->
+            <button type="button" onclick="apriModaleCloud()" title="Configura Google Fogli"
+                class="p-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 active:scale-95 border border-neutral-700 text-neutral-200 transition-all">
+                <i data-lucide="cloud-cog" class="w-5 h-5 text-sky-400"></i>
+            </button>
+
+            <!-- Contatore Rilevazioni -->
+            <div class="flex flex-col items-end">
+                <span class="text-[10px] uppercase tracking-wider text-neutral-400 font-bold">Registrate</span>
+                <div class="flex items-center gap-1.5 bg-[#D32F2F]/20 border border-[#D32F2F]/50 px-3 py-1 rounded-full">
+                    <span id="counter-badge" class="text-base font-extrabold text-[#FF5252]">0</span>
+                    <i data-lucide="users" class="w-4 h-4 text-[#FF5252]"></i>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- MODALE CONFIGURAZIONE GOOGLE FOGLI -->
+    <div id="modal-cloud" class="fixed inset-0 z-50 hidden bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-[#1E1E1E] border border-neutral-700 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-neutral-800 pb-3">
+                <h3 class="font-extrabold text-base text-white flex items-center gap-2">
+                    <i data-lucide="sheet" class="w-5 h-5 text-emerald-400"></i>
+                    Collegamento Google Fogli
+                </h3>
+                <button type="button" onclick="chiudiModaleCloud()" class="p-1.5 text-neutral-400 hover:text-white rounded-lg">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <p class="text-xs text-neutral-300 leading-relaxed">
+                Incolla qui l'URL della Web App ottenuto da <strong>Google Apps Script</strong> (termina con <code class="text-sky-400">/exec</code>). Ogni rilevazione salvata verrà inviata in tempo reale al foglio online.
+            </p>
+
+            <div class="space-y-1.5">
+                <label for="input-script-url" class="block text-xs font-bold uppercase tracking-wider text-neutral-400">URL Google Apps Script</label>
+                <input type="url" id="input-script-url" placeholder="https://script.google.com/macros/s/.../exec"
+                    class="w-full bg-[#121212] border border-neutral-700 focus:border-sky-500 rounded-xl px-3.5 py-3 text-sm text-white placeholder-neutral-600 focus:outline-none">
+            </div>
+
+            <div class="grid grid-cols-2 gap-2.5 pt-2">
+                <button type="button" onclick="rimuoviUrlCloud()" 
+                    class="py-3 px-4 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-xs font-bold text-neutral-300 border border-neutral-700 transition-all">
+                    Disconnetti / Svuota
+                </button>
+                <button type="button" onclick="salvaUrlCloud()" 
+                    class="py-3 px-4 rounded-xl bg-sky-600 hover:bg-sky-500 text-xs font-extrabold text-white shadow-lg transition-all">
+                    Salva Collegamento
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOTIFICA TOAST (Sostituisce alert()) -->
+    <div id="toast-container" class="fixed top-20 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-md pointer-events-none transition-all duration-300 opacity-0 -translate-y-2">
+        <div id="toast-box" class="bg-neutral-800 border border-neutral-700 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3">
+            <i id="toast-icon" data-lucide="check-circle-2" class="w-5 h-5 text-emerald-400 shrink-0"></i>
+            <span id="toast-message" class="text-sm font-semibold">Messaggio</span>
+        </div>
+    </div>
+
+    <!-- CONTENUTO PRINCIPALE -->
+    <main class="flex-1 p-4 space-y-6 pb-24">
+
+        <!-- SEZIONE 1: MODULO DI INSERIMENTO RAPIDO -->
+        <form id="record-form" class="space-y-5 bg-[#1E1E1E] p-4 rounded-2xl border border-neutral-800 shadow-lg">
+            
+            <!-- BLOCCO POSIZIONE -->
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <label class="text-xs font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-1.5">
+                        <i data-lucide="map-pin" class="w-4 h-4 text-[#D32F2F]"></i>
+                        1. Posizione Rilevamento
+                    </label>
+                    <span id="gps-accuracy" class="text-xs text-neutral-500 font-mono">GPS non rilevato</span>
+                </div>
+
+                <button type="button" id="btn-get-gps" onclick="rilevaPosizione()" 
+                    class="w-full py-3.5 px-4 bg-[#D32F2F] hover:bg-[#B71C1C] active:scale-[0.98] transition-all rounded-xl font-bold text-white flex items-center justify-center gap-2.5 shadow-lg shadow-red-950/50">
+                    <i data-lucide="crosshair" class="w-5 h-5" id="gps-icon"></i>
+                    <span id="gps-btn-text">Rileva Posizione GPS Attuale</span>
+                </button>
+
+                <!-- Pulsante alternativo se il GPS è bloccato dall'iframe di Google Apps Script -->
+                <div class="flex justify-end">
+                    <a href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer"
+                        class="text-[11px] text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1 py-0.5">
+                        <i data-lucide="map" class="w-3.5 h-3.5"></i>
+                        Apri Google Maps per copiare coordinate
+                    </a>
+                </div>
+
+                <!-- Coordinate Lat/Lon (sola lettura o editabili se serve) -->
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="bg-[#121212] px-3 py-2 rounded-xl border border-neutral-800">
+                        <span class="block text-[10px] text-neutral-500 uppercase font-bold">Latitudine</span>
+                        <input type="text" id="lat" placeholder="--.------" class="w-full bg-transparent text-sm font-mono text-neutral-200 focus:outline-none">
+                    </div>
+                    <div class="bg-[#121212] px-3 py-2 rounded-xl border border-neutral-800">
+                        <span class="block text-[10px] text-neutral-500 uppercase font-bold">Longitudine</span>
+                        <input type="text" id="lon" placeholder="--.------" class="w-full bg-transparent text-sm font-mono text-neutral-200 focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- Punto di riferimento / Indirizzo -->
+                <div>
+                    <input type="text" id="indirizzo" placeholder="Indirizzo o punto di rif. (es. Portici Via Roma 12)" 
+                        class="w-full bg-[#121212] border border-neutral-700 focus:border-[#D32F2F] rounded-xl px-3.5 py-3 text-white placeholder-neutral-500 focus:outline-none transition-colors">
+                </div>
+            </div>
+
+            <hr class="border-neutral-800">
+
+            <!-- BLOCCO ANAGRAFICA -->
+            <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <label class="text-xs font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-1.5">
+                        <i data-lucide="user" class="w-4 h-4 text-[#D32F2F]"></i>
+                        2. Dati Persona
+                    </label>
+                    
+                    <!-- Checkbox Sconosciuto -->
+                    <label class="flex items-center gap-2 cursor-pointer bg-neutral-800/80 px-3 py-1.5 rounded-lg border border-neutral-700 active:bg-neutral-700">
+                        <input type="checkbox" id="chk-sconosciuto" onchange="toggleSconosciuto()" class="w-4 h-4 accent-[#D32F2F] rounded">
+                        <span class="text-xs font-semibold text-neutral-200">Non dichiarato / Sconosciuto</span>
+                    </label>
+                </div>
+
+                <!-- Nome e Cognome -->
+                <div class="grid grid-cols-2 gap-2.5" id="anagrafica-inputs">
+                    <input type="text" id="nome" placeholder="Nome" 
+                        class="w-full bg-[#121212] border border-neutral-700 focus:border-[#D32F2F] rounded-xl px-3.5 py-3 text-white placeholder-neutral-500 focus:outline-none">
+                    <input type="text" id="cognome" placeholder="Cognome" 
+                        class="w-full bg-[#121212] border border-neutral-700 focus:border-[#D32F2F] rounded-xl px-3.5 py-3 text-white placeholder-neutral-500 focus:outline-none">
+                </div>
+
+                <!-- Sesso (Toggle grandi) -->
+                <div>
+                    <span class="block text-xs text-neutral-400 font-semibold mb-1.5">Sesso</span>
+                    <div class="grid grid-cols-3 gap-2" id="sesso-group">
+                        <button type="button" onclick="selezionaSesso('M')" data-val="M" class="sesso-btn py-3 rounded-xl font-bold text-sm bg-[#121212] border border-neutral-700 text-neutral-300 transition-all">Uomo (M)</button>
+                        <button type="button" onclick="selezionaSesso('F')" data-val="F" class="sesso-btn py-3 rounded-xl font-bold text-sm bg-[#121212] border border-neutral-700 text-neutral-300 transition-all">Donna (F)</button>
+                        <button type="button" onclick="selezionaSesso('Altro / N.D.')" data-val="Altro / N.D." class="sesso-btn py-3 rounded-xl font-bold text-sm bg-neutral-700 border-neutral-500 text-white transition-all">Altro / N.D.</button>
+                    </div>
+                    <input type="hidden" id="sesso" value="Altro / N.D.">
+                </div>
+
+                <!-- Età Presunta e Nazionalità -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <!-- Età con controlli rapidi -->
+                    <div>
+                        <span class="block text-xs text-neutral-400 font-semibold mb-1.5">Età Presunta</span>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" onclick="modificaEta(-5)" class="w-11 h-12 bg-neutral-800 hover:bg-neutral-700 active:scale-95 rounded-xl font-bold text-neutral-200 border border-neutral-700 flex items-center justify-center">-5</button>
+                            <input type="number" id="eta" placeholder="Es. 45" min="0" max="120" 
+                                class="flex-1 w-full h-12 bg-[#121212] border border-neutral-700 focus:border-[#D32F2F] rounded-xl px-3 text-center font-bold text-white placeholder-neutral-600 focus:outline-none">
+                            <button type="button" onclick="modificaEta(5)" class="w-11 h-12 bg-neutral-800 hover:bg-neutral-700 active:scale-95 rounded-xl font-bold text-neutral-200 border border-neutral-700 flex items-center justify-center">+5</button>
+                        </div>
+                    </div>
+
+                    <!-- Nazionalità con suggerimenti -->
+                    <div>
+                        <span class="block text-xs text-neutral-400 font-semibold mb-1.5">Nazionalità</span>
+                        <input type="text" id="nazionalita" list="lista-nazionalita" placeholder="Es. Italiana, Rumena..." 
+                            class="w-full h-12 bg-[#121212] border border-neutral-700 focus:border-[#D32F2F] rounded-xl px-3.5 text-white placeholder-neutral-500 focus:outline-none">
+                        <datalist id="lista-nazionalita">
+                            <option value="Italiana">
+                            <option value="Rumena">
+                            <option value="Marocchina">
+                            <option value="Tunisina">
+                            <option value="Nigeriana">
+                            <option value="Ucraina">
+                            <option value="Polacca">
+                            <option value="Sconosciuta">
+                        </datalist>
+                    </div>
+                </div>
+            </div>
+
+            <hr class="border-neutral-800">
+
+            <!-- BLOCCO CONDIZIONI -->
+            <div class="space-y-2.5">
+                <label class="text-xs font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-1.5">
+                    <i data-lucide="activity" class="w-4 h-4 text-[#D32F2F]"></i>
+                    3. Condizioni Rilevate (selezione multipla)
+                </label>
+
+                <div class="grid grid-cols-1 gap-2" id="condizioni-group">
+                    <button type="button" onclick="toggleCondizione(this, 'Buone / Stabile')" 
+                        class="cond-btn w-full py-3 px-4 rounded-xl border border-neutral-700 bg-[#121212] text-left font-bold text-sm flex items-center justify-between transition-all"
+                        data-active-class="bg-emerald-950/80 border-emerald-500 text-emerald-300">
+                        <span class="flex items-center gap-2.5">
+                            <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+                            Buone / Stabile
+                        </span>
+                        <i data-lucide="check" class="w-4 h-4 opacity-0 check-icon"></i>
+                    </button>
+
+                    <button type="button" onclick="toggleCondizione(this, 'Necessita Coperte / Viveri')" 
+                        class="cond-btn w-full py-3 px-4 rounded-xl border border-neutral-700 bg-[#121212] text-left font-bold text-sm flex items-center justify-between transition-all"
+                        data-active-class="bg-amber-950/80 border-amber-500 text-amber-300">
+                        <span class="flex items-center gap-2.5">
+                            <span class="w-3 h-3 rounded-full bg-amber-500"></span>
+                            Necessita Coperte / Viveri
+                        </span>
+                        <i data-lucide="check" class="w-4 h-4 opacity-0 check-icon"></i>
+                    </button>
+
+                    <button type="button" onclick="toggleCondizione(this, 'Richiede Valutazione Medica')" 
+                        class="cond-btn w-full py-3 px-4 rounded-xl border border-neutral-700 bg-[#121212] text-left font-bold text-sm flex items-center justify-between transition-all"
+                        data-active-class="bg-red-950/90 border-red-500 text-red-300">
+                        <span class="flex items-center gap-2.5">
+                            <span class="w-3 h-3 rounded-full bg-red-500 animate-pulse"></span>
+                            Richiede Valutazione Medica
+                        </span>
+                        <i data-lucide="check" class="w-4 h-4 opacity-0 check-icon"></i>
+                    </button>
+
+                    <button type="button" onclick="toggleCondizione(this, 'Rifiuta Contatto / Aiuto')" 
+                        class="cond-btn w-full py-3 px-4 rounded-xl border border-neutral-700 bg-[#121212] text-left font-bold text-sm flex items-center justify-between transition-all"
+                        data-active-class="bg-neutral-800 border-neutral-400 text-neutral-200">
+                        <span class="flex items-center gap-2.5">
+                            <span class="w-3 h-3 rounded-full bg-neutral-400"></span>
+                            Rifiuta Contatto / Aiuto
+                        </span>
+                        <i data-lucide="check" class="w-4 h-4 opacity-0 check-icon"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- BLOCCO NOTE -->
+            <div class="space-y-1.5">
+                <label for="note" class="text-xs font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-1.5">
+                    <i data-lucide="file-text" class="w-4 h-4 text-[#D32F2F]"></i>
+                    4. Note Aggiuntive
+                </label>
+                <textarea id="note" rows="2" placeholder="Es. Presenza cane, sacco a pelo bagnato, richiesto intervento 118..." 
+                    class="w-full bg-[#121212] border border-neutral-700 focus:border-[#D32F2F] rounded-xl p-3 text-white placeholder-neutral-500 focus:outline-none resize-none"></textarea>
+            </div>
+
+            <!-- PULSANTE SALVA -->
+            <button type="submit" id="btn-submit-salva"
+                class="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] transition-all rounded-xl font-extrabold text-base text-white flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/50">
+                <i data-lucide="save" class="w-5 h-5" id="save-icon"></i>
+                <span id="save-btn-text">SALVA RILEVAZIONE</span>
+            </button>
+        </form>
+
+        <!-- SEZIONE 2: STRUMENTI FINE TURNO E STORICO -->
+        <section class="space-y-4">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+                <h2 class="text-sm font-extrabold uppercase tracking-wider text-neutral-300 flex items-center gap-2">
+                    <i data-lucide="clipboard-list" class="w-4 h-4 text-[#D32F2F]"></i>
+                    Rilevazioni del Turno
+                </h2>
+                <div class="flex items-center gap-2">
+                    <button type="button" id="btn-sync-pending" onclick="sincronizzaNonInviati()" 
+                        class="hidden text-xs font-bold text-sky-300 hover:text-sky-200 px-2.5 py-1.5 rounded-lg bg-sky-950/60 border border-sky-700/70 flex items-center gap-1.5 transition-all">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="sync-icon"></i>
+                        <span>Sincronizza (<span id="pending-count">0</span>)</span>
+                    </button>
+                    <button type="button" id="btn-svuota" onclick="gestisciSvuotaRegistro()" 
+                        class="text-xs font-bold text-red-400 hover:text-red-300 px-2.5 py-1.5 rounded-lg bg-red-950/30 border border-red-900/50 transition-colors">
+                        Svuota Registro
+                    </button>
+                </div>
+            </div>
+
+            <!-- Pulsanti Esportazione Rapida -->
+            <div class="grid grid-cols-2 gap-2.5">
+                <button type="button" onclick="esportaCSV()" 
+                    class="py-3 px-3 bg-[#1E1E1E] hover:bg-neutral-800 active:scale-95 border border-neutral-700 rounded-xl font-bold text-xs text-white flex items-center justify-center gap-2 transition-all">
+                    <i data-lucide="download" class="w-4 h-4 text-emerald-400"></i>
+                    Esporta CSV (Excel)
+                </button>
+                <button type="button" onclick="copiaReportTestuale()" 
+                    class="py-3 px-3 bg-[#1E1E1E] hover:bg-neutral-800 active:scale-95 border border-neutral-700 rounded-xl font-bold text-xs text-white flex items-center justify-center gap-2 transition-all">
+                    <i data-lucide="copy" class="w-4 h-4 text-sky-400"></i>
+                    Copia per WhatsApp
+                </button>
+            </div>
+
+            <!-- Lista Card Rilevazioni -->
+            <div id="lista-rilevazioni" class="space-y-3">
+                <!-- Popolato dinamicamente via JS -->
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // Inizializzazione icone Lucide
+        lucide.createIcons();
+
+        // Puoi inserire qui il tuo URL di Google Apps Script se vuoi pre-configurarlo nel file HTML,
+        // oppure configurarlo direttamente dall'app cliccando sull'icona della nuvola in alto a destra.
+        const DEFAULT_GOOGLE_SCRIPT_URL = "";
+
+        // Stato dell'applicazione
+        let rilevazioni = [];
+        let condizioniSelezionate = [];
+        let googleScriptUrl = "";
+        let confermaSvuotaStep = false;
+        let confermaSvuotaTimeout = null;
+
+        // Caricamento dati e configurazione Cloud all'avvio
+        window.addEventListener('DOMContentLoaded', () => {
+            const datiSalvati = localStorage.getItem('cri_unita_strada_v1');
+            if (datiSalvati) {
+                try {
+                    rilevazioni = JSON.parse(datiSalvati);
+                } catch (e) {
+                    rilevazioni = [];
+                }
+            }
+
+            const urlSalvato = localStorage.getItem('cri_google_script_url');
+            googleScriptUrl = urlSalvato ? urlSalvato.trim() : DEFAULT_GOOGLE_SCRIPT_URL.trim();
+            aggiornaStatoCloudUI();
+            aggiornaUI();
+        });
+
+        // Gestione Modale Configurazione Google Fogli
+        function apriModaleCloud() {
+            document.getElementById('input-script-url').value = googleScriptUrl;
+            document.getElementById('modal-cloud').classList.remove('hidden');
+        }
+
+        function chiudiModaleCloud() {
+            document.getElementById('modal-cloud').classList.add('hidden');
+        }
+
+        function salvaUrlCloud() {
+            const val = document.getElementById('input-script-url').value.trim();
+            if (val && !val.startsWith('https://script.google.com/')) {
+                mostraNotifica("L'URL deve iniziare con https://script.google.com/", "error");
+                return;
+            }
+            googleScriptUrl = val;
+            localStorage.setItem('cri_google_script_url', googleScriptUrl);
+            aggiornaStatoCloudUI();
+            chiudiModaleCloud();
+            mostraNotifica(googleScriptUrl ? "Google Fogli collegato!" : "Modalità solo locale attiva.", "success");
+        }
+
+        function rimuoviUrlCloud() {
+            googleScriptUrl = "";
+            document.getElementById('input-script-url').value = "";
+            localStorage.removeItem('cri_google_script_url');
+            aggiornaStatoCloudUI();
+            chiudiModaleCloud();
+            mostraNotifica("Collegamento Cloud rimosso.", "info");
+        }
+
+        function aggiornaStatoCloudUI() {
+            const dot = document.getElementById('cloud-status-dot');
+            const text = document.getElementById('cloud-status-text');
+            if (googleScriptUrl) {
+                dot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
+                text.textContent = "Google Fogli Collegato";
+                text.className = "text-[11px] text-emerald-400 font-semibold";
+            } else {
+                dot.className = "w-2 h-2 rounded-full bg-amber-500";
+                text.textContent = "Solo Locale (Cloud non config.)";
+                text.className = "text-[11px] text-amber-400 font-semibold";
+            }
+        }
+
+        // Funzione Toast (Notifiche non invasive al posto di alert)
+        function mostraNotifica(messaggio, tipo = 'success') {
+            const container = document.getElementById('toast-container');
+            const msgEl = document.getElementById('toast-message');
+        // 1. Rilevamento Posizione GPS (ottimizzato per iOS, Android, Chrome e Google Apps Script)
+        let gpsWatchId = null;
+        let gpsTimeoutId = null;
+
+        function fermaRicercaGPS() {
+            if (gpsWatchId !== null) {
+                navigator.geolocation.clearWatch(gpsWatchId);
+                gpsWatchId = null;
+            }
+            if (gpsTimeoutId !== null) {
+                clearTimeout(gpsTimeoutId);
+                gpsTimeoutId = null;
+            }
+        }
+
+        function rilevaPosizione() {
+            const btnText = document.getElementById('gps-btn-text');
+            const accLabel = document.getElementById('gps-accuracy');
+            const icon = document.getElementById('gps-icon');
+
+            fermaRicercaGPS();
+
+            if (!navigator.geolocation) {
+                mostraNotifica("GPS non supportato dal browser. Inserisci manualmente.", "error");
+                return;
+            }
+
+            // Controllo specifico per file locali o iframe senza delega permessi
+            if (window.location.protocol === 'file:') {
+                accLabel.textContent = "Bloccato (file://)";
+                accLabel.className = "text-xs text-red-400 font-mono font-bold";
+                mostraNotifica("Su Android/iOS il GPS non funziona aprendo un file locale. Pubblica su HTTPS.", "error");
+                return;
+            }
+
+            btnText.textContent = "Acquisizione satelliti...";
+            icon.classList.add('animate-spin');
+            accLabel.textContent = "Ricerca segnale...";
+            accLabel.className = "text-xs text-amber-400 font-mono";
+
+            let posizioneTrovata = false;
+
+            const onSuccess = (position) => {
+                posizioneTrovata = true;
+                fermaRicercaGPS();
+
+                const lat = position.coords.latitude.toFixed(6);
+                const lon = position.coords.longitude.toFixed(6);
+                const acc = Math.round(position.coords.accuracy);
+
+                document.getElementById('lat').value = lat;
+                document.getElementById('lon').value = lon;
+                accLabel.textContent = `Precisione: ±${acc}m`;
+                accLabel.className = "text-xs text-emerald-400 font-mono font-bold";
+
+                btnText.textContent = "Posizione Acquisita";
+                icon.classList.remove('animate-spin');
+                
+                if (navigator.vibrate) navigator.vibrate(50);
+                mostraNotifica(`Coordinate acquisite (precisione ${acc}m)`);
+
+                // Reverse geocoding gratuito (OpenStreetMap Nominatim) se online
+                fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data && data.address) {
+                            const via = data.address.road || data.address.pedestrian || data.address.square || '';
+                            const civico = data.address.house_number ? `, ${data.address.house_number}` : '';
+                            const citta = data.address.city || data.address.town || data.address.village || '';
+                            const indCompleto = [via + civico, citta].filter(Boolean).join(' - ');
+                            const inputIndirizzo = document.getElementById('indirizzo');
+                            if (indCompleto && !inputIndirizzo.value.trim()) {
+                                inputIndirizzo.value = indCompleto;
+                            }
+                        }
+                    })
+                    .catch(() => {});
+            };
+
+            const onError = (error) => {
+                if (posizioneTrovata) return;
+                fermaRicercaGPS();
+
+                btnText.textContent = "Rileva Posizione GPS Attuale";
+                icon.classList.remove('animate-spin');
+                accLabel.textContent = `Errore GPS (${error.code || 'Bloccato'})`;
+                accLabel.className = "text-xs text-red-400 font-mono font-bold";
+
+                const inIframe = window.self !== window.top;
+                let msg = "Impossibile rilevare la posizione.";
+
+                if (error.code === 1) { // PERMISSION_DENIED
+                    if (inIframe) {
+                        msg = "Blocco iframe rilevato (Google Apps Script/Anteprima blocca il GPS). Vedi istruzioni per GitHub Pages o usa Google Maps qui sotto.";
+                    } else {
+                        msg = "Permesso GPS negato. Abilita la posizione per il sito nelle impostazioni di Chrome/Safari.";
+                    }
+                } else if (error.code === 2) { // POSITION_UNAVAILABLE
+                    msg = "Segnale GPS non disponibile. Verifica che la Localizzazione del telefono sia attiva.";
+                } else if (error.code === 3) { // TIMEOUT
+                    msg = "Timeout GPS. Spostati all'aperto o inserisci indirizzo/coordinate manualmente.";
+                }
+                mostraNotifica(msg, "error");
+            };
+
+            // Utilizza watchPosition per svegliare immediatamente il chip GPS su iOS e Android
+            gpsWatchId = navigator.geolocation.watchPosition(
+                onSuccess,
+                onError,
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+            );
+
+            // Fallback di sicurezza se watchPosition non risponde entro 12 secondi
+            gpsTimeoutId = setTimeout(() => {
+                if (!posizioneTrovata) {
+                    fermaRicercaGPS();
+                    navigator.geolocation.getCurrentPosition(
+                        onSuccess,
+                        onError,
+                        { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+                    );
+                }
+            }, 12000);
+        }
+
+        // 2. Toggle Persona Sconosciuta
+        function toggleSconosciuto() {
+            const chk = document.getElementById('chk-sconosciuto').checked;
+            const nomeInput = document.getElementById('nome');
+            const cognomeInput = document.getElementById('cognome');
+
+            nomeInput.disabled = chk;
+            cognomeInput.disabled = chk;
+
+            if (chk) {
+                nomeInput.value = "Sconosciuto";
+                cognomeInput.value = "";
+                nomeInput.classList.add('opacity-50');
+                cognomeInput.classList.add('opacity-50');
+            } else {
+                nomeInput.value = "";
+                nomeInput.classList.remove('opacity-50');
+                cognomeInput.classList.remove('opacity-50');
+            }
+        }
+
+        // 3. Selezione Sesso
+        function selezionaSesso(valore) {
+            document.getElementById('sesso').value = valore;
+            document.querySelectorAll('.sesso-btn').forEach(btn => {
+                if (btn.getAttribute('data-val') === valore) {
+                    btn.className = "sesso-btn py-3 rounded-xl font-bold text-sm bg-neutral-700 border border-neutral-500 text-white transition-all";
+                } else {
+                    btn.className = "sesso-btn py-3 rounded-xl font-bold text-sm bg-[#121212] border border-neutral-700 text-neutral-300 transition-all";
+                }
+            });
+        }
+
+        // 4. Modifica rapida Età Presunta
+        function modificaEta(delta) {
+            const etaInput = document.getElementById('eta');
+            let val = parseInt(etaInput.value, 10);
+            if (isNaN(val)) {
+                val = delta > 0 ? 30 : 25;
+            } else {
+                val = Math.max(0, Math.min(120, val + delta));
+            }
+            etaInput.value = val;
+        }
+
+        // 5. Selezione multipla Condizioni
+        function toggleCondizione(btn, condizione) {
+            const idx = condizioniSelezionate.indexOf(condizione);
+            const activeClasses = btn.getAttribute('data-active-class').split(' ');
+            const checkIcon = btn.querySelector('.check-icon');
+
+            if (idx === -1) {
+                condizioniSelezionate.push(condizione);
+                btn.classList.remove('bg-[#121212]', 'border-neutral-700');
+                btn.classList.add(...activeClasses);
+                checkIcon.classList.remove('opacity-0');
+            } else {
+                condizioniSelezionate.splice(idx, 1);
+                btn.classList.remove(...activeClasses);
+                btn.classList.add('bg-[#121212]', 'border-neutral-700');
+                checkIcon.classList.add('opacity-0');
+            }
+        }
+
+        // 6. Salvataggio Rilevazione (Locale + Invio Cloud via fetch)
+        document.getElementById('record-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const now = new Date();
+            const dataStr = now.toLocaleDateString('it-IT');
+            const oraStr = now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+
+            const lat = document.getElementById('lat').value.trim() || "N.D.";
+            const lon = document.getElementById('lon').value.trim() || "N.D.";
+            const indirizzo = document.getElementById('indirizzo').value.trim() || "Posizione non specificata";
+            
+            const isSconosciuto = document.getElementById('chk-sconosciuto').checked;
+            const nome = isSconosciuto ? "Sconosciuto" : (document.getElementById('nome').value.trim() || "Non dichiarato");
+            const cognome = isSconosciuto ? "" : document.getElementById('cognome').value.trim();
+            const sesso = document.getElementById('sesso').value;
+            const eta = document.getElementById('eta').value.trim() || "N.D.";
+            const nazionalita = document.getElementById('nazionalita').value.trim() || "N.D.";
+            const note = document.getElementById('note').value.trim();
+
+            const condizioniFinali = condizioniSelezionate.length > 0 ? [...condizioniSelezionate] : ["Non specificata"];
+
+            const nuovaScheda = {
+                id: Date.now(),
+                data: dataStr,
+                ora: oraStr,
+                lat,
+                lon,
+                indirizzo,
+                nome,
+                cognome,
+                sesso,
+                eta,
+                nazionalita,
+                condizioni: condizioniFinali,
+                note,
+                sincronizzato: false
+            };
+
+            // 1. Salva subito in locale per sicurezza (zero perdita dati offline)
+            rilevazioni.unshift(nuovaScheda);
+            salvaInMemoria();
+            aggiornaUI();
+            resetModulo();
+
+            if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+
+            // 2. Se Google Apps Script è configurato, invia i dati al Google Foglio tramite fetch
+            if (googleScriptUrl) {
+                const btnSalva = document.getElementById('btn-submit-salva');
+                const saveText = document.getElementById('save-btn-text');
+                btnSalva.disabled = true;
+                saveText.textContent = "INVIO A GOOGLE FOGLI...";
+
+                const inviato = await inviaSchedaAlCloud(nuovaScheda);
+
+                btnSalva.disabled = false;
+                saveText.textContent = "SALVA RILEVAZIONE";
+
+                if (inviato) {
+                    nuovaScheda.sincronizzato = true;
+                    salvaInMemoria();
+                    aggiornaUI();
+                    mostraNotifica("Salvato sul telefono e su Google Fogli!");
+                } else {
+                    mostraNotifica("Salvato sul telefono (invio Cloud fallito, ritenta dopo).", "error");
+                }
+            } else {
+                mostraNotifica("Rilevazione salvata nella memoria locale!");
+            }
+        });
+
+        // Chiamata fetch verso Google Apps Script
+        async function inviaSchedaAlCloud(scheda) {
+            if (!googleScriptUrl) return false;
+
+            const payload = {
+                timestamp: `${scheda.data} ${scheda.ora}`,
+                gps: (scheda.lat !== "N.D." && scheda.lon !== "N.D.") ? `${scheda.lat}, ${scheda.lon}` : "N.D.",
+                indirizzo: scheda.indirizzo,
+                nome: scheda.nome,
+                cognome: scheda.cognome,
+                sesso: scheda.sesso,
+                eta: scheda.eta,
+                nazionalita: scheda.nazionalita,
+                condizioni: scheda.condizioni.join(', '),
+                note: scheda.note
+            };
+
+            try {
+                await fetch(googleScriptUrl, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                });
+                return true;
+            } catch (error) {
+                console.error("Errore invio fetch:", error);
+                return false;
+            }
+        }
+
+        // Sincronizzazione manuale per le schede salvate offline
+        async function sincronizzaNonInviati() {
+            if (!googleScriptUrl) {
+                apriModaleCloud();
+                mostraNotifica("Configura prima l'URL di Google Fogli.", "info");
+                return;
+            }
+
+            const daInviare = rilevazioni.filter(r => !r.sincronizzato);
+            if (daInviare.length === 0) return;
+
+            const syncIcon = document.getElementById('sync-icon');
+            syncIcon.classList.add('animate-spin');
+
+            let contatoreOk = 0;
+            for (const scheda of daInviare) {
+                const ok = await inviaSchedaAlCloud(scheda);
+                if (ok) {
+                    scheda.sincronizzato = true;
+                    contatoreOk++;
+                }
+            }
+
+            syncIcon.classList.remove('animate-spin');
+            salvaInMemoria();
+            aggiornaUI();
+
+            if (contatoreOk === daInviare.length) {
+                mostraNotifica(`Sincronizzate ${contatoreOk} rilevazioni su Google Fogli!`);
+            } else {
+                mostraNotifica(`Inviate ${contatoreOk} su ${daInviare.length}. Controlla la rete.`, "error");
+            }
+        }
+
+        function resetModulo() {
+            document.getElementById('chk-sconosciuto').checked = false;
+            toggleSconosciuto();
+            document.getElementById('eta').value = "";
+            document.getElementById('nazionalita').value = "";
+            document.getElementById('note').value = "";
+            selezionaSesso('Altro / N.D.');
+
+            // Reset condizioni
+            condizioniSelezionate = [];
+            document.querySelectorAll('.cond-btn').forEach(btn => {
+                const activeClasses = btn.getAttribute('data-active-class').split(' ');
+                btn.classList.remove(...activeClasses);
+                btn.classList.add('bg-[#121212]', 'border-neutral-700');
+                btn.querySelector('.check-icon').classList.add('opacity-0');
+            });
+            // Nota: manteniamo lat/lon/indirizzo nel caso ci siano più persone nello stesso punto!
+        }
+
+        function salvaInMemoria() {
+            localStorage.setItem('cri_unita_strada_v1', JSON.stringify(rilevazioni));
+        }
+
+        function eliminaRilevazione(id) {
+            rilevazioni = rilevazioni.filter(r => r.id !== id);
+            salvaInMemoria();
+            aggiornaUI();
+            mostraNotifica("Voce eliminata", "info");
+        }
+
+        // 7. Rendering Lista e Contatore
+        function aggiornaUI() {
+            const listaEl = document.getElementById('lista-rilevazioni');
+            const counterEl = document.getElementById('counter-badge');
+            const btnSync = document.getElementById('btn-sync-pending');
+            const pendingCountEl = document.getElementById('pending-count');
+
+            counterEl.textContent = rilevazioni.length;
+
+            // Gestione pulsante sincronizzazione offline
+            const nonInviati = rilevazioni.filter(r => !r.sincronizzato).length;
+            if (nonInviati > 0 && googleScriptUrl) {
+                btnSync.classList.remove('hidden');
+                pendingCountEl.textContent = nonInviati;
+            } else {
+                btnSync.classList.add('hidden');
+            }
+
+            if (rilevazioni.length === 0) {
+                listaEl.innerHTML = `
+                    <div class="text-center py-8 px-4 bg-[#1E1E1E]/50 rounded-2xl border border-dashed border-neutral-800">
+                        <p class="text-sm text-neutral-500 font-medium">Nessuna rilevazione registrata in questo turno.</p>
+                        <p class="text-xs text-neutral-600 mt-1">Compila il modulo qui sopra per iniziare.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            listaEl.innerHTML = rilevazioni.map(r => {
+                // Badge condizioni
+                const badgesHtml = r.condizioni.map(c => {
+                    let colorClass = "bg-neutral-800 text-neutral-300 border-neutral-700";
+                    if (c.includes("Buone")) colorClass = "bg-emerald-950 text-emerald-300 border-emerald-800";
+                    if (c.includes("Coperte")) colorClass = "bg-amber-950 text-amber-300 border-amber-800";
+                    if (c.includes("Medica")) colorClass = "bg-red-950 text-red-300 border-red-800 font-extrabold";
+                    return `<span class="text-[11px] px-2 py-0.5 rounded-md border ${colorClass}">${c}</span>`;
+                }).join(' ');
+
+                // Badge stato Cloud
+                const cloudBadge = r.sincronizzato
+                    ? `<span class="text-[10px] font-bold text-emerald-400 bg-emerald-950/70 border border-emerald-800/80 px-2 py-0.5 rounded-full flex items-center gap-1"><i data-lucide="cloud-check" class="w-3 h-3"></i> Cloud OK</span>`
+                    : `<span class="text-[10px] font-bold text-amber-400 bg-amber-950/70 border border-amber-800/80 px-2 py-0.5 rounded-full flex items-center gap-1"><i data-lucide="smartphone" class="w-3 h-3"></i> Solo Locale</span>`;
+
+                const hasCoords = r.lat !== "N.D." && r.lon !== "N.D.";
+                const mapsLink = hasCoords ? `https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lon}` : null;
+
+                return `
+                <div class="bg-[#1E1E1E] p-3.5 rounded-2xl border border-neutral-800 shadow-md space-y-2 relative">
+                    <div class="flex items-start justify-between gap-2">
+                        <div>
+                            <div class="flex items-center flex-wrap gap-2">
+                                <span class="text-xs font-mono font-bold text-[#FF5252] bg-[#D32F2F]/15 px-2 py-0.5 rounded">${r.ora}</span>
+                                <h3 class="font-bold text-base text-white">${r.nome} ${r.cognome}</h3>
+                                ${cloudBadge}
+                            </div>
+                            <p class="text-xs text-neutral-400 mt-1">
+                                Sesso: <strong class="text-neutral-200">${r.sesso}</strong> • 
+                                Età: <strong class="text-neutral-200">${r.eta}</strong> • 
+                                Naz: <strong class="text-neutral-200">${r.nazionalita}</strong>
+                            </p>
+                        </div>
+                        <button onclick="eliminaRilevazione(${r.id})" class="p-2 text-neutral-500 hover:text-red-400 rounded-lg transition-colors" title="Elimina">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
+                    <div class="flex flex-wrap gap-1.5">
+                        ${badgesHtml}
+                    </div>
+
+                    <div class="text-xs text-neutral-300 bg-[#121212] p-2 rounded-xl border border-neutral-800/80 flex items-center justify-between gap-2">
+                        <span class="truncate"><i data-lucide="map-pin" class="w-3.5 h-3.5 inline text-[#D32F2F] mr-1"></i>${r.indirizzo}</span>
+                        ${mapsLink ? `<a href="${mapsLink}" target="_blank" class="text-sky-400 hover:underline shrink-0 font-semibold flex items-center gap-1">Mappa <i data-lucide="external-link" class="w-3 h-3"></i></a>` : ''}
+                    </div>
+
+                    ${r.note ? `<p class="text-xs text-neutral-400 italic bg-neutral-900/60 px-2.5 py-1.5 rounded-lg border-l-2 border-neutral-600">"${r.note}"</p>` : ''}
+                </div>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
+        // 8. Esportazione CSV (Compatibile Excel con BOM UTF-8 e punto e virgola)
+        function esportaCSV() {
+            if (rilevazioni.length === 0) {
+                mostraNotifica("Nessun dato da esportare.", "error");
+                return;
+            }
+
+            const intestazioni = ["Data", "Ora", "Latitudine", "Longitudine", "Indirizzo/Riferimento", "Nome", "Cognome", "Sesso", "Eta Presunta", "Nazionalita", "Condizioni", "Note"];
+            
+            const righe = rilevazioni.map(r => [
+                r.data,
+                r.ora,
+                r.lat,
+                r.lon,
+                `"${r.indirizzo.replace(/"/g, '""')}"`,
+                `"${r.nome.replace(/"/g, '""')}"`,
+                `"${r.cognome.replace(/"/g, '""')}"`,
+                r.sesso,
+                r.eta,
+                `"${r.nazionalita.replace(/"/g, '""')}"`,
+                `"${r.condizioni.join(', ').replace(/"/g, '""')}"`,
+                `"${r.note.replace(/"/g, '""')}"`
+            ].join(';'));
+
+            const csvContent = "\uFEFF" + intestazioni.join(';') + "\n" + righe.join("\n");
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement("a");
+            const oggi = new Date().toISOString().slice(0, 10);
+            link.setAttribute("href", url);
+            link.setAttribute("download", `Report_Unita_Strada_${oggi}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            mostraNotifica("File CSV scaricato!");
+        }
+
+        // 9. Copia Report Testuale (con fallback document.execCommand)
+        function copiaReportTestuale() {
+            if (rilevazioni.length === 0) {
+                mostraNotifica("Nessun dato da copiare.", "error");
+                return;
+            }
+
+            const oggi = new Date().toLocaleDateString('it-IT');
+            let testo = `🚨 *REPORT UNITÀ DI STRADA - ${oggi}*\nTotale persone monitorate: ${rilevazioni.length}\n\n`;
+
+            rilevazioni.forEach((r, idx) => {
+                testo += `*${idx + 1}. [${r.ora}] ${r.nome} ${r.cognome}* (${r.sesso}, ~${r.eta} anni, ${r.nazionalita})\n`;
+                testo += `📍 ${r.indirizzo}`;
+                if (r.lat !== "N.D.") testo += ` (https://maps.google.com/?q=${r.lat},${r.lon})`;
+                testo += `\n🩺 Condizioni: ${r.condizioni.join(', ')}\n`;
+                if (r.note) testo += `📝 Note: ${r.note}\n`;
+                testo += `-------------------\n`;
+            });
+
+            const textArea = document.createElement("textarea");
+            textArea.value = testo;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                mostraNotifica("Report copiato! Pronto da incollare su WhatsApp.");
+            } catch (err) {
+                mostraNotifica("Errore durante la copia.", "error");
+            }
+            document.body.removeChild(textArea);
+        }
+
+        // 10. Svuota Registro con doppia conferma
+        function gestisciSvuotaRegistro() {
+            if (rilevazioni.length === 0) return;
+
+            const btn = document.getElementById('btn-svuota');
+            if (!confermaSvuotaStep) {
+                confermaSvuotaStep = true;
+                btn.textContent = "Confermi eliminazione?";
+                btn.className = "text-xs font-extrabold text-white px-3 py-1.5 rounded-lg bg-red-600 animate-pulse";
+                
+                confermaSvuotaTimeout = setTimeout(() => {
+                    confermaSvuotaStep = false;
+                    btn.textContent = "Svuota Registro";
+                    btn.className = "text-xs font-bold text-red-400 hover:text-red-300 px-2.5 py-1.5 rounded-lg bg-red-950/30 border border-red-900/50";
+                }, 4000);
+            } else {
+                clearTimeout(confermaSvuotaTimeout);
+                confermaSvuotaStep = false;
+                rilevazioni = [];
+                salvaInMemoria();
+                aggiornaUI();
+                btn.textContent = "Svuota Registro";
+                btn.className = "text-xs font-bold text-red-400 hover:text-red-300 px-2.5 py-1.5 rounded-lg bg-red-950/30 border border-red-900/50";
+                mostraNotifica("Registro svuotato.", "info");
+            }
+        }
+    </script>
+</body>
+</html>
